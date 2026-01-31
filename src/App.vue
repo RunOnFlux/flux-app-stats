@@ -1,185 +1,317 @@
 <template>
-  <div class="container">
-    <div class="header">
-      <h1>Flux App Analyzer</h1>
-      <p>Analyze app registrations on the Flux network from any time period</p>
-    </div>
+  <v-app>
+    <v-main>
+      <v-container fluid>
+        <div class="d-flex justify-space-between align-center mb-6">
+          <div></div>
+          <div class="text-center flex-grow-1">
+            <h1>Flux App Analyzer</h1>
+            <p>Analyze app registrations on the Flux network from any time period</p>
+          </div>
+          <v-btn
+            icon
+            @click="toggleTheme"
+            variant="text"
+          >
+            <v-icon>{{ isDark ? 'mdi-white-balance-sunny' : 'mdi-weather-night' }}</v-icon>
+          </v-btn>
+        </div>
 
-    <div class="controls">
-      <div class="input-group">
-        <label for="startDate">Start Date & Time (UTC)</label>
-        <input
-          id="startDate"
-          v-model="startDate"
-          type="datetime-local"
-          @change="validateDates"
-        />
-      </div>
+        <v-row class="mb-6 justify-center">
+          <v-col cols="auto">
+            <v-text-field
+              v-model="startDate"
+              label="Start Date & Time (UTC)"
+              type="datetime-local"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @change="validateDates"
+            ></v-text-field>
+          </v-col>
 
-      <div class="input-group">
-        <label for="endDate">End Date & Time (UTC) - Optional</label>
-        <input
-          id="endDate"
-          v-model="endDate"
-          type="datetime-local"
-          @change="validateDates"
-        />
-      </div>
+          <v-col cols="auto">
+            <v-text-field
+              v-model="endDate"
+              label="End Date & Time (UTC) - Optional"
+              type="datetime-local"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @change="validateDates"
+            ></v-text-field>
+          </v-col>
 
-      <button class="btn" @click="analyze" :disabled="loading || !startDate">
-        {{ loading ? 'Analyzing...' : 'Analyze' }}
-      </button>
-    </div>
+          <v-col cols="auto">
+            <v-btn
+              color="primary"
+              size="large"
+              :loading="loading"
+              :disabled="!startDate"
+              @click="analyze"
+            >
+              Analyze
+            </v-btn>
+          </v-col>
+        </v-row>
 
-    <div v-if="error" class="error">
-      <strong>Error:</strong> {{ error }}
-    </div>
+        <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
+          {{ error }}
+        </v-alert>
 
-    <div v-if="loading" class="loading">
-      <div class="loading-spinner"></div>
-      <div>{{ loadingMessage }}</div>
-    </div>
+        <v-card v-if="loading" class="mb-4">
+          <v-card-text class="d-flex flex-column align-center pa-8">
+            <v-progress-circular
+              indeterminate
+              color="primary"
+              size="64"
+              class="mb-4"
+            ></v-progress-circular>
+            <div>{{ loadingMessage }}</div>
+          </v-card-text>
+        </v-card>
 
     <template v-if="results && !loading">
       <!-- Summary Cards -->
-      <div class="summary-cards">
-        <div class="card">
-          <div class="card-title">New Apps</div>
-          <div class="card-value">{{ results.summary.newApps }}</div>
-          <div class="card-subtitle">{{ results.rates.appsPerDay }}/day</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Total Instances</div>
-          <div class="card-value">{{ results.summary.totalInstances }}</div>
-          <div class="card-subtitle">{{ results.rates.instancesPerDay }}/day</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Multi-Component</div>
-          <div class="card-value">{{ results.summary.multiComponentApps }}</div>
-          <div class="card-subtitle">{{ ((results.summary.multiComponentApps / results.summary.newApps) * 100).toFixed(1) }}% of total</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Time Period</div>
-          <div class="card-value">{{ results.timeSinceStart.days }}</div>
-          <div class="card-subtitle">days ({{ results.timeSinceStart.hours }} hours)</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Block Range</div>
-          <div class="card-value">{{ results.heightRange.difference.toLocaleString() }}</div>
-          <div class="card-subtitle">{{ results.heightRange.min }} → {{ results.heightRange.max }}</div>
-          <div class="card-subtitle">Avg: {{ results.heightRange.avgBlockTime }}s/block</div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Orbit Apps</div>
-          <div class="card-value">{{ results.summary.orbitApps }}</div>
-          <div class="card-subtitle">{{ ((results.summary.orbitApps / results.summary.newApps) * 100).toFixed(1) }}% of total</div>
-        </div>
-      </div>
-
-      <!-- Charts -->
-      <div class="charts">
-        <div class="chart-container">
-          <h3>Apps by Owner (Top 10)</h3>
-          <Bar :data="ownerChartData" :options="chartOptions" />
-        </div>
-
-        <div class="chart-container">
-          <h3>Instances Distribution (Top 10)</h3>
-          <Doughnut :data="instancesChartData" :options="doughnutOptions" />
-        </div>
-
-        <div class="chart-container">
-          <h3>Apps Over Time</h3>
-          <Line :data="timelineChartData" :options="timelineOptions" />
-        </div>
-
-        <div class="chart-container">
-          <h3>App Categories</h3>
-          <Pie :data="categoryChartData" :options="doughnutOptions" />
-        </div>
-
-        <div v-if="orbitChartData" class="chart-container">
-          <h3>Orbit vs Non-Orbit Apps</h3>
-          <Doughnut :data="orbitChartData" :options="doughnutOptions" />
-        </div>
-
-        <div v-if="multiComponentChartData" class="chart-container">
-          <h3>Multi-Component Apps</h3>
-          <Pie :data="multiComponentChartData" :options="doughnutOptions" />
-        </div>
-
-      </div>
-
-      <!-- High Instance Apps List -->
-      <div v-if="highInstanceApps.length > 0" class="section">
-        <h2>Apps with >10 Instances ({{ highInstanceApps.length }})</h2>
-        <div class="high-instance-grid">
-          <div v-for="(app, index) in highInstanceApps" :key="app.name" class="high-instance-card">
-            <div class="high-instance-header">
-              <div class="high-instance-rank">#{{ index + 1 }}</div>
-              <div class="high-instance-name">{{ app.name }}</div>
-            </div>
-            <div class="high-instance-chips">
-              <div class="chip chip-instances">
-                <span class="chip-icon">🖥️</span>
-                <span class="chip-label">{{ app.instances }} instance{{ app.instances > 1 ? 's' : '' }}</span>
-              </div>
-              <div class="chip chip-components">
-                <span class="chip-icon">📦</span>
-                <span class="chip-label">{{ app.components }} component{{ app.components > 1 ? 's' : '' }}</span>
-              </div>
-              <div v-if="app.isOrbitApp" class="chip chip-orbit">
-                <span class="chip-icon">🚀</span>
-                <span class="chip-label">Orbit</span>
-              </div>
-            </div>
-            <div class="high-instance-owner">
-              <span class="owner-icon">👤</span>
-              <span class="owner-text">{{ app.owner.substring(0, 24) }}...</span>
-            </div>
-            <div v-if="app.repotags && app.repotags.length > 0" class="high-instance-repotags">
-              <div class="repotag-label">🏷️ Docker Images:</div>
-              <div class="repotag-chips">
-                <div v-for="tag in app.repotags" :key="tag" class="repotag-chip">
-                  {{ tag }}
+      <v-row class="mb-6">
+        <v-col cols="12" sm="6" md="4" lg="2">
+          <v-card variant="tonal" color="primary" class="h-100">
+            <v-card-text class="d-flex flex-column" style="min-height: 150px;">
+              <div class="d-flex align-center mb-2">
+                <v-icon size="40" class="mr-3">mdi-apps</v-icon>
+                <div>
+                  <div class="text-h4 font-weight-bold">{{ results.summary.newApps }}</div>
+                  <div class="text-subtitle-2">New Apps</div>
                 </div>
               </div>
-            </div>
-          </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="text-caption">{{ results.rates.appsPerDay }} apps/day</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="4" lg="2">
+          <v-card variant="tonal" color="secondary" class="h-100">
+            <v-card-text class="d-flex flex-column" style="min-height: 150px;">
+              <div class="d-flex align-center mb-2">
+                <v-icon size="40" class="mr-3">mdi-server-network</v-icon>
+                <div>
+                  <div class="text-h4 font-weight-bold">{{ results.summary.totalInstances }}</div>
+                  <div class="text-subtitle-2">Total Instances</div>
+                </div>
+              </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="text-caption">{{ results.rates.instancesPerDay }} instances/day</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="4" lg="2">
+          <v-card variant="tonal" color="success" class="h-100">
+            <v-card-text class="d-flex flex-column" style="min-height: 150px;">
+              <div class="d-flex align-center mb-2">
+                <v-icon size="40" class="mr-3">mdi-package-variant-closed</v-icon>
+                <div>
+                  <div class="text-h4 font-weight-bold">{{ results.summary.multiComponentApps }}</div>
+                  <div class="text-subtitle-2">Multi-Component</div>
+                </div>
+              </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="text-caption">{{ ((results.summary.multiComponentApps / results.summary.newApps) * 100).toFixed(1) }}% of total</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="4" lg="2">
+          <v-card variant="tonal" color="info" class="h-100">
+            <v-card-text class="d-flex flex-column" style="min-height: 150px;">
+              <div class="d-flex align-center mb-2">
+                <v-icon size="40" class="mr-3">mdi-calendar-clock</v-icon>
+                <div>
+                  <div class="text-h4 font-weight-bold">{{ results.timeSinceStart.days }}</div>
+                  <div class="text-subtitle-2">Days</div>
+                </div>
+              </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="text-caption">{{ results.timeSinceStart.hours }} hours total</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="4" lg="2">
+          <v-card variant="tonal" color="warning" class="h-100">
+            <v-card-text class="d-flex flex-column" style="min-height: 150px;">
+              <div class="d-flex align-center mb-2">
+                <v-icon size="40" class="mr-3">mdi-cube-outline</v-icon>
+                <div>
+                  <div class="text-h4 font-weight-bold">{{ results.heightRange.difference.toLocaleString() }}</div>
+                  <div class="text-subtitle-2">Blocks</div>
+                </div>
+              </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="text-caption">{{ results.heightRange.min }} → {{ results.heightRange.max }}</div>
+              <div class="text-caption">Avg: {{ results.heightRange.avgBlockTime }}s/block</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="4" lg="2">
+          <v-card variant="tonal" color="purple" class="h-100">
+            <v-card-text class="d-flex flex-column" style="min-height: 150px;">
+              <div class="d-flex align-center mb-2">
+                <v-icon size="40" class="mr-3">mdi-rocket-launch</v-icon>
+                <div>
+                  <div class="text-h4 font-weight-bold">{{ results.summary.orbitApps }}</div>
+                  <div class="text-subtitle-2">Orbit Apps</div>
+                </div>
+              </div>
+              <v-divider class="my-2"></v-divider>
+              <div class="text-caption">{{ ((results.summary.orbitApps / results.summary.newApps) * 100).toFixed(1) }}% of total</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- Charts -->
+      <v-row class="mb-6">
+        <v-col cols="12" md="6">
+          <v-card>
+            <v-card-title>Apps by Owner (Top 10)</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Bar :data="ownerChartData" :options="chartOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-card>
+            <v-card-title>Instances Distribution (Top 10)</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Doughnut :data="instancesChartData" :options="doughnutOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-card>
+            <v-card-title>Apps Over Time</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Line :data="timelineChartData" :options="timelineOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-card>
+            <v-card-title>App Categories</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Pie :data="categoryChartData" :options="doughnutOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col v-if="orbitChartData" cols="12" md="6">
+          <v-card>
+            <v-card-title>Orbit vs Non-Orbit Apps</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Doughnut :data="orbitChartData" :options="doughnutOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col v-if="multiComponentChartData" cols="12" md="6">
+          <v-card>
+            <v-card-title>Multi-Component Apps</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Pie :data="multiComponentChartData" :options="doughnutOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- High Instance Apps List -->
+      <div v-if="highInstanceApps.length > 0" class="mb-6">
+        <div class="d-flex align-center mb-4">
+          <h2 class="text-h5">Apps with >10 Instances</h2>
+          <v-chip variant="tonal" color="primary" prepend-icon="mdi-fire" class="ml-3">{{ highInstanceApps.length }}</v-chip>
         </div>
+        <v-row>
+          <v-col v-for="(app, index) in highInstanceApps" :key="app.name" cols="12" md="6" lg="4">
+            <v-card>
+              <v-card-title class="d-flex align-center">
+                <v-chip variant="tonal" color="purple" size="small" class="mr-2">#{{ index + 1 }}</v-chip>
+                <span class="text-truncate">{{ app.name }}</span>
+              </v-card-title>
+              <v-card-text>
+                <div class="d-flex flex-wrap mb-3">
+                  <v-chip variant="tonal" color="primary" prepend-icon="mdi-monitor-multiple" size="small" class="mr-2 mb-2">
+                    {{ app.instances }} instance{{ app.instances > 1 ? 's' : '' }}
+                  </v-chip>
+                  <v-chip variant="tonal" color="secondary" prepend-icon="mdi-package-variant" size="small" class="mr-2 mb-2">
+                    {{ app.components }} component{{ app.components > 1 ? 's' : '' }}
+                  </v-chip>
+                  <v-chip v-if="app.isOrbitApp" variant="tonal" color="purple" prepend-icon="mdi-rocket-launch" size="small" class="mr-2 mb-2">
+                    Orbit
+                  </v-chip>
+                </div>
+                <div class="d-flex align-center" style="gap: 4px;">
+                  <v-icon size="small">mdi-account</v-icon>
+                  <span class="text-caption text-truncate" style="font-family: monospace;">{{ app.owner }}</span>
+                </div>
+                <div v-if="app.repotags && app.repotags.length > 0" class="mt-3">
+                  <div class="text-caption font-weight-bold mb-2">
+                    <v-icon size="default">mdi-docker</v-icon> Docker Images:
+                  </div>
+                  <v-chip
+                    v-for="tag in app.repotags"
+                    :key="tag"
+                    size="x-small"
+                    class="mr-1 mb-1"
+                    variant="outlined"
+                  >
+                    {{ tag }}
+                  </v-chip>
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
       </div>
 
       <!-- Top Owners -->
-      <div class="section">
-        <h2>Top 10 App Owners</h2>
-        <div class="top-owners-grid">
-          <div v-for="(owner, index) in results.topOwners.slice(0, 10)" :key="owner.owner" class="top-owner-card">
-            <div class="top-owner-header">
-              <div class="top-owner-rank">#{{ index + 1 }}</div>
-              <div class="top-owner-address">{{ owner.owner }}</div>
-            </div>
-            <div class="top-owner-chips">
-              <div class="chip chip-apps">
-                <span class="chip-icon">📱</span>
-                <span class="chip-label">{{ owner.apps }} app{{ owner.apps > 1 ? 's' : '' }}</span>
-              </div>
-              <div class="chip chip-total-instances">
-                <span class="chip-icon">💻</span>
-                <span class="chip-label">{{ owner.instances }} instance{{ owner.instances > 1 ? 's' : '' }}</span>
-              </div>
-            </div>
-          </div>
+      <div class="mb-6">
+        <div class="d-flex align-center mb-4">
+          <h2 class="text-h5">Top App Owners</h2>
+          <v-chip variant="tonal" color="secondary" prepend-icon="mdi-account-star" class="ml-3">10</v-chip>
         </div>
+        <v-row>
+          <v-col v-for="(owner, index) in results.topOwners.slice(0, 10)" :key="owner.owner" cols="12" md="6" lg="4">
+            <v-card>
+              <v-card-title class="d-flex align-center">
+                <v-chip variant="tonal" color="purple" size="small" class="mr-2">#{{ index + 1 }}</v-chip>
+                <span class="text-truncate font-weight-mono text-caption">{{ owner.owner }}</span>
+              </v-card-title>
+              <v-card-text>
+                <div class="d-flex flex-wrap">
+                  <v-chip variant="tonal" color="primary" prepend-icon="mdi-application" size="small" class="mr-2 mb-2">
+                    {{ owner.apps }} app{{ owner.apps > 1 ? 's' : '' }}
+                  </v-chip>
+                  <v-chip variant="tonal" color="secondary" prepend-icon="mdi-laptop" size="small" class="mr-2 mb-2">
+                    {{ owner.instances }} instance{{ owner.instances > 1 ? 's' : '' }}
+                  </v-chip>
+                </div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
       </div>
 
       <!-- Orbit Apps List -->
-      <div v-if="results.orbitApps.length > 0" class="section">
-        <h2>Orbit Apps ({{ results.orbitApps.length }})</h2>
+      <div v-if="results.orbitApps.length > 0" class="mb-6">
+        <div class="d-flex align-center mb-4">
+          <h2 class="text-h5">Orbit Apps</h2>
+          <v-chip variant="tonal" color="purple" prepend-icon="mdi-rocket-launch" class="ml-3">{{ results.orbitApps.length }}</v-chip>
+        </div>
         <RecycleScroller
           class="app-scroller"
           :items="results.orbitApps"
@@ -191,28 +323,28 @@
             <div class="app-header">
               <div class="app-name">
                 {{ index + 1 }}. {{ item.name }}
-                <span v-if="item.isMultiComponent" class="app-badge">{{ item.components }} components</span>
+                <v-chip v-if="item.isMultiComponent" variant="tonal" color="secondary" size="x-small" class="ml-2">{{ item.components }} components</v-chip>
               </div>
             </div>
             <div class="app-details">
               <div class="app-detail">
-                <span class="app-detail-label">Date</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-calendar</v-icon>Date</span>
                 <span>{{ formatDate(item.date) }}</span>
               </div>
               <div class="app-detail">
-                <span class="app-detail-label">Height</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-cube-outline</v-icon>Height</span>
                 <span>{{ item.height.toLocaleString() }}</span>
               </div>
               <div class="app-detail">
-                <span class="app-detail-label">Instances</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-monitor-multiple</v-icon>Instances</span>
                 <span>{{ item.instances }}</span>
               </div>
               <div class="app-detail">
-                <span class="app-detail-label">Owner</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-account</v-icon>Owner</span>
                 <span style="font-family: monospace; font-size: 0.8rem;">{{ item.owner }}</span>
               </div>
               <div v-if="item.repotags && item.repotags.length > 0" class="app-detail" style="grid-column: 1 / -1;">
-                <span class="app-detail-label">Repotags</span>
+                <span class="app-detail-label"><v-icon size="default" class="mr-1">mdi-docker</v-icon>Repotags</span>
                 <span style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">{{ item.repotags.join(', ') }}</span>
               </div>
             </div>
@@ -221,8 +353,11 @@
       </div>
 
       <!-- All Apps List -->
-      <div class="section">
-        <h2>All New Apps ({{ results.newApps.length }})</h2>
+      <div class="mb-6">
+        <div class="d-flex align-center mb-4">
+          <h2 class="text-h5">All New Apps</h2>
+          <v-chip variant="tonal" color="success" prepend-icon="mdi-apps" class="ml-3">{{ results.newApps.length }}</v-chip>
+        </div>
         <RecycleScroller
           class="app-scroller"
           :items="results.newApps"
@@ -234,29 +369,29 @@
             <div class="app-header">
               <div class="app-name">
                 {{ index + 1 }}. {{ item.name }}
-                <span v-if="item.isMultiComponent" class="app-badge">{{ item.components }} components</span>
-                <span v-if="item.isOrbitApp" class="app-badge orbit-badge">Orbit</span>
+                <v-chip v-if="item.isMultiComponent" variant="tonal" color="secondary" size="x-small" class="ml-2">{{ item.components }} components</v-chip>
+                <v-chip v-if="item.isOrbitApp" variant="tonal" color="purple" size="x-small" class="ml-2">Orbit</v-chip>
               </div>
             </div>
             <div class="app-details">
               <div class="app-detail">
-                <span class="app-detail-label">Date</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-calendar</v-icon>Date</span>
                 <span>{{ formatDate(item.date) }}</span>
               </div>
               <div class="app-detail">
-                <span class="app-detail-label">Height</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-cube-outline</v-icon>Height</span>
                 <span>{{ item.height.toLocaleString() }}</span>
               </div>
               <div class="app-detail">
-                <span class="app-detail-label">Instances</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-monitor-multiple</v-icon>Instances</span>
                 <span>{{ item.instances }}</span>
               </div>
               <div class="app-detail">
-                <span class="app-detail-label">Owner</span>
+                <span class="app-detail-label"><v-icon size="small" class="mr-1">mdi-account</v-icon>Owner</span>
                 <span style="font-family: monospace; font-size: 0.8rem;">{{ item.owner }}</span>
               </div>
               <div v-if="item.repotags && item.repotags.length > 0" class="app-detail" style="grid-column: 1 / -1;">
-                <span class="app-detail-label">Repotags</span>
+                <span class="app-detail-label"><v-icon size="default" class="mr-1">mdi-docker</v-icon>Repotags</span>
                 <span style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">{{ item.repotags.join(', ') }}</span>
               </div>
             </div>
@@ -264,11 +399,14 @@
         </RecycleScroller>
       </div>
     </template>
-  </div>
+      </v-container>
+    </v-main>
+  </v-app>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useTheme } from 'vuetify'
 import { Bar, Doughnut, Line, Pie } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -282,6 +420,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
+import ChartDataLabels from 'chartjs-plugin-datalabels'
 
 ChartJS.register(
   CategoryScale,
@@ -292,10 +431,27 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartDataLabels
 )
 
 const API_BASE = 'https://api.runonflux.io'
+
+// Theme management
+const theme = useTheme()
+const isDark = computed(() => theme.global.current.value.dark)
+
+// Load saved theme preference on mount
+const savedTheme = localStorage.getItem('theme')
+if (savedTheme) {
+  theme.global.name.value = savedTheme
+}
+
+const toggleTheme = () => {
+  const newTheme = theme.global.current.value.dark ? 'light' : 'dark'
+  theme.global.name.value = newTheme
+  localStorage.setItem('theme', newTheme)
+}
 
 // Fork constants - PON fork where chain became 4x faster
 const FORK_BLOCK_HEIGHT = 2020000
@@ -575,7 +731,11 @@ const ownerChartData = computed(() => {
     datasets: [{
       label: 'Apps',
       data: top10.map(o => o.apps),
-      backgroundColor: 'rgba(102, 126, 234, 0.8)',
+      backgroundColor: [
+        '#667eea', '#764ba2', '#f093fb', '#4facfe',
+        '#43e97b', '#fa709a', '#fee140', '#30cfd0',
+        '#a8edea', '#fed6e3'
+      ],
     }]
   }
 })
@@ -690,42 +850,199 @@ const highInstanceApps = computed(() => {
     .sort((a, b) => b.instances - a.instances)
 })
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    }
-  }
-}
+const chartOptions = computed(() => {
+  const textColor = isDark.value ? '#ffffff' : '#000000'
+  const gridColor = isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
 
-const doughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'bottom'
-    }
-  }
-}
-
-const timelineOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: true,
-      position: 'top'
-    }
-  },
-  scales: {
-    y: {
-      beginAtZero: true,
-      ticks: {
-        stepSize: 1
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      datalabels: {
+        display: false
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: textColor
+        },
+        grid: {
+          color: gridColor
+        }
+      },
+      y: {
+        ticks: {
+          color: textColor
+        },
+        grid: {
+          color: gridColor
+        }
       }
     }
   }
-}
+})
+
+const doughnutOptions = computed(() => {
+  const textColor = isDark.value ? '#ffffff' : '#000000'
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: textColor
+        }
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const label = context.label || ''
+            const value = context.parsed || 0
+            const total = context.dataset.data.reduce((acc, val) => acc + val, 0)
+            const percentage = ((value / total) * 100).toFixed(1)
+            return `${label}: ${value} (${percentage}%)`
+          }
+        }
+      },
+      datalabels: {
+        display: true,
+        color: '#fff',
+        font: {
+          weight: 'bold',
+          size: 14
+        },
+        formatter: function(value, context) {
+          const total = context.dataset.data.reduce((acc, val) => acc + val, 0)
+          const percentage = ((value / total) * 100).toFixed(1)
+          return percentage > 5 ? `${percentage}%` : ''
+        }
+      }
+    }
+  }
+})
+
+const timelineOptions = computed(() => {
+  const textColor = isDark.value ? '#ffffff' : '#000000'
+  const gridColor = isDark.value ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+  const bgColor = isDark.value ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)'
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: {
+          color: textColor
+        }
+      },
+      datalabels: {
+        display: false
+      },
+      tooltip: {
+        enabled: false,
+        external: function(context) {
+          // Tooltip Element
+          let tooltipEl = document.getElementById('chartjs-tooltip')
+
+          // Create element on first render
+          if (!tooltipEl) {
+            tooltipEl = document.createElement('div')
+            tooltipEl.id = 'chartjs-tooltip'
+            tooltipEl.innerHTML = '<div></div>'
+            document.body.appendChild(tooltipEl)
+          }
+
+          // Hide if no tooltip
+          const tooltipModel = context.tooltip
+          if (tooltipModel.opacity === 0) {
+            tooltipEl.style.opacity = 0
+            return
+          }
+
+          // Set Text
+          if (tooltipModel.body) {
+            const dataPoints = tooltipModel.dataPoints
+            const dataPoint = dataPoints[0]
+            const dataIndex = dataPoint.dataIndex
+            const datasetIndex = dataPoint.datasetIndex
+            const dataset = context.chart.data.datasets[datasetIndex]
+
+            const label = dataset.label || ''
+            const value = dataPoint.parsed.y
+
+            let innerHtml = `<div style="padding: 6px 10px; background: ${bgColor}; border: 1px solid #666; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 12px;">`
+
+            // First line - label and value
+            innerHtml += `<div style="color: ${textColor}; margin-bottom: 3px;">${label}: ${value}</div>`
+
+            // Second line - trend with colored text
+            if (dataIndex > 0) {
+              const currentValue = dataset.data[dataIndex]
+              const previousValue = dataset.data[dataIndex - 1]
+              const change = currentValue - previousValue
+              const percentChange = previousValue !== 0 ? ((change / previousValue) * 100).toFixed(1) : 0
+
+              let trendText = ''
+              let trendColor = textColor
+
+              if (change > 0) {
+                trendText = `▲ +${change} (+${percentChange}%)`
+                trendColor = '#4caf50'
+              } else if (change < 0) {
+                trendText = `▼ ${change} (${percentChange}%)`
+                trendColor = '#f44336'
+              } else {
+                trendText = '━ No change (0%)'
+              }
+
+              innerHtml += `<div style="color: ${trendColor}; font-weight: bold; font-size: 11px;">${trendText}</div>`
+            }
+
+            innerHtml += '</div>'
+
+            tooltipEl.innerHTML = innerHtml
+          }
+
+          const position = context.chart.canvas.getBoundingClientRect()
+
+          // Display, position, and set styles for font
+          tooltipEl.style.opacity = 1
+          tooltipEl.style.position = 'absolute'
+          tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 'px'
+          tooltipEl.style.top = position.top + window.pageYOffset + tooltipModel.caretY + 'px'
+          tooltipEl.style.pointerEvents = 'none'
+          tooltipEl.style.transition = 'all 0.1s ease'
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: textColor
+        },
+        grid: {
+          color: gridColor
+        }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: {
+          stepSize: 1,
+          color: textColor
+        },
+        grid: {
+          color: gridColor
+        }
+      }
+    }
+  }
+})
 </script>
