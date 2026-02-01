@@ -230,12 +230,28 @@
       </v-row>
 
       <!-- High Instance Apps List -->
-      <div v-if="highInstanceApps.length > 0" class="mb-6">
-        <div class="d-flex align-center mb-4">
-          <h2 class="text-h5">Apps with >10 Instances</h2>
-          <v-chip variant="tonal" color="primary" prepend-icon="mdi-fire" class="ml-3">{{ highInstanceApps.length }}</v-chip>
+      <div class="mb-6">
+        <div class="d-flex justify-space-between align-center mb-4">
+          <div class="d-flex align-center">
+            <h2 class="text-h5">High Instance Apps</h2>
+            <v-chip variant="tonal" color="primary" prepend-icon="mdi-fire" class="ml-3">{{ highInstanceApps.length }}</v-chip>
+          </div>
+          <v-text-field
+            v-model.number="instanceThreshold"
+            type="number"
+            label="Minimum Instances"
+            prepend-inner-icon="mdi-filter"
+            variant="outlined"
+            density="compact"
+            hide-details
+            style="max-width: 200px;"
+            min="1"
+          ></v-text-field>
         </div>
-        <v-row>
+        <v-alert v-if="highInstanceApps.length === 0" type="info" variant="tonal" icon="mdi-information-outline">
+          No apps found with more than {{ instanceThreshold }} instances. Try lowering the threshold.
+        </v-alert>
+        <v-row v-else>
           <v-col v-for="(app, index) in highInstanceApps" :key="app.name" cols="12" md="6" lg="4">
             <v-card>
               <v-card-title class="d-flex align-center">
@@ -265,9 +281,12 @@
                   <v-chip
                     v-for="tag in app.repotags"
                     :key="tag"
-                    size="x-small"
+                    size="small"
                     class="mr-1 mb-1"
                     variant="outlined"
+                    :href="getRegistryUrl(tag)"
+                    target="_blank"
+                    link
                   >
                     {{ tag }}
                   </v-chip>
@@ -315,11 +334,11 @@
         <RecycleScroller
           class="app-scroller"
           :items="results.orbitApps"
-          :item-size="140"
+          :item-size="160"
           key-field="name"
           v-slot="{ item, index }"
         >
-          <div class="app-item">
+          <div class="app-item" style="min-height: 160px; padding: 12px; margin-bottom: 8px; border: 1px solid rgba(128,128,128,0.2); border-radius: 4px;">
             <div class="app-header">
               <div class="app-name">
                 {{ index + 1 }}. {{ item.name }}
@@ -345,7 +364,19 @@
               </div>
               <div v-if="item.repotags && item.repotags.length > 0" class="app-detail" style="grid-column: 1 / -1;">
                 <span class="app-detail-label"><v-icon size="default" class="mr-1">mdi-docker</v-icon>Repotags</span>
-                <span style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">{{ item.repotags.join(', ') }}</span>
+                <div class="d-flex flex-wrap" style="gap: 4px;">
+                  <v-chip
+                    v-for="tag in item.repotags"
+                    :key="tag"
+                    size="small"
+                    variant="outlined"
+                    :href="getRegistryUrl(tag)"
+                    target="_blank"
+                    link
+                  >
+                    {{ tag }}
+                  </v-chip>
+                </div>
               </div>
             </div>
           </div>
@@ -361,11 +392,11 @@
         <RecycleScroller
           class="app-scroller"
           :items="results.newApps"
-          :item-size="140"
+          :item-size="160"
           key-field="name"
           v-slot="{ item, index }"
         >
-          <div class="app-item">
+          <div class="app-item" style="min-height: 160px; padding: 12px; margin-bottom: 8px; border: 1px solid rgba(128,128,128,0.2); border-radius: 4px;">
             <div class="app-header">
               <div class="app-name">
                 {{ index + 1 }}. {{ item.name }}
@@ -392,7 +423,19 @@
               </div>
               <div v-if="item.repotags && item.repotags.length > 0" class="app-detail" style="grid-column: 1 / -1;">
                 <span class="app-detail-label"><v-icon size="default" class="mr-1">mdi-docker</v-icon>Repotags</span>
-                <span style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">{{ item.repotags.join(', ') }}</span>
+                <div class="d-flex flex-wrap" style="gap: 4px;">
+                  <v-chip
+                    v-for="tag in item.repotags"
+                    :key="tag"
+                    size="small"
+                    variant="outlined"
+                    :href="getRegistryUrl(tag)"
+                    target="_blank"
+                    link
+                  >
+                    {{ tag }}
+                  </v-chip>
+                </div>
               </div>
             </div>
           </div>
@@ -465,6 +508,7 @@ const loading = ref(false)
 const loadingMessage = ref('')
 const error = ref('')
 const results = ref(null)
+const instanceThreshold = ref(10)
 
 // Set default date (AMA date)
 const now = new Date()
@@ -494,6 +538,45 @@ const formatDate = (date) => {
     minute: '2-digit',
     timeZone: 'UTC'
   })
+}
+
+// Get registry URL from repo tag
+const getRegistryUrl = (repotag) => {
+  // ghcr.io/owner/repo:tag -> https://github.com/owner/repo/pkgs/container/repo
+  if (repotag.startsWith('ghcr.io/')) {
+    const parts = repotag.replace('ghcr.io/', '').split(':')[0].split('/')
+    if (parts.length >= 2) {
+      const owner = parts[0]
+      const repo = parts[parts.length - 1]
+      return `https://github.com/${owner}/${parts.slice(1).join('/')}/pkgs/container/${repo}`
+    }
+  }
+
+  // gcr.io/project/image:tag -> https://gcr.io/project/image
+  if (repotag.startsWith('gcr.io/')) {
+    return `https://${repotag.split(':')[0]}`
+  }
+
+  // quay.io/owner/repo:tag -> https://quay.io/repository/owner/repo
+  if (repotag.startsWith('quay.io/')) {
+    const path = repotag.replace('quay.io/', '').split(':')[0]
+    return `https://quay.io/repository/${path}`
+  }
+
+  // registry.gitlab.com/owner/repo:tag -> https://gitlab.com/owner/repo/container_registry
+  if (repotag.startsWith('registry.gitlab.com/')) {
+    const path = repotag.replace('registry.gitlab.com/', '').split(':')[0]
+    return `https://gitlab.com/${path}/container_registry`
+  }
+
+  // Docker Hub: either "owner/repo:tag" or "repo:tag"
+  const dockerHubPath = repotag.split(':')[0]
+  if (dockerHubPath.includes('/')) {
+    return `https://hub.docker.com/r/${dockerHubPath}`
+  } else {
+    // Official image (no namespace)
+    return `https://hub.docker.com/_/${dockerHubPath}`
+  }
 }
 
 // Calculate fork-aware average block time
@@ -846,7 +929,7 @@ const highInstanceApps = computed(() => {
   if (!results.value || !results.value.newApps) return []
 
   return results.value.newApps
-    .filter(app => app.instances > 10)
+    .filter(app => app.instances > instanceThreshold.value)
     .sort((a, b) => b.instances - a.instances)
 })
 
