@@ -17,7 +17,22 @@
           </v-btn>
         </div>
 
-        <v-row class="mb-6 justify-center">
+        <v-row class="mb-4 justify-center">
+          <v-col cols="auto">
+            <v-btn-toggle
+              v-model="analysisMode"
+              color="primary"
+              variant="outlined"
+              mandatory
+              density="compact"
+            >
+              <v-btn value="single">Single Period</v-btn>
+              <v-btn value="compare">Compare Period</v-btn>
+            </v-btn-toggle>
+          </v-col>
+        </v-row>
+
+        <v-row v-if="analysisMode === 'single'" class="mb-6 justify-center">
           <v-col cols="auto">
             <v-text-field
               v-model="startDate"
@@ -55,6 +70,44 @@
           </v-col>
         </v-row>
 
+        <v-row v-if="analysisMode === 'compare'" class="mb-6 justify-center">
+          <v-col cols="auto">
+            <v-select
+              v-model="compareMonth1"
+              :items="availableMonths"
+              label="First Month"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="min-width: 200px;"
+            ></v-select>
+          </v-col>
+
+          <v-col cols="auto">
+            <v-select
+              v-model="compareMonth2"
+              :items="availableMonths"
+              label="Second Month"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="min-width: 200px;"
+            ></v-select>
+          </v-col>
+
+          <v-col cols="auto">
+            <v-btn
+              color="primary"
+              size="large"
+              :loading="loading"
+              :disabled="!compareMonth1 || !compareMonth2"
+              @click="compareMonths"
+            >
+              Compare
+            </v-btn>
+          </v-col>
+        </v-row>
+
         <v-card v-if="error" class="mb-4 error-card" color="error" variant="tonal" elevation="8" rounded="xl">
           <v-card-text class="d-flex flex-column align-center pa-10">
             <v-icon
@@ -69,7 +122,166 @@
           </v-card-text>
         </v-card>
 
-    <template v-if="results && !loading">
+    <!-- Comparison Results -->
+    <template v-if="results && results.isComparison && !loading">
+      <v-row class="mb-6">
+        <v-col cols="12">
+          <v-card rounded="lg">
+            <v-card-title class="text-h5">Month Comparison</v-card-title>
+            <v-card-text>
+              <v-row>
+                <v-col cols="12" md="5">
+                  <v-card variant="tonal" color="primary" rounded="lg">
+                    <v-card-title>{{ results.comparison.month1.name }}</v-card-title>
+                    <v-card-text>
+                      <div class="mb-3 d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-apps</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month1.totalApps }}</div>
+                          <div class="text-subtitle-2">Total Apps</div>
+                        </div>
+                      </div>
+                      <div class="mb-3 d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-server-network</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month1.totalInstances }}</div>
+                          <div class="text-subtitle-2">Total Instances</div>
+                        </div>
+                      </div>
+                      <div class="mb-3 d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-rocket-launch</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month1.orbitApps }}</div>
+                          <div class="text-subtitle-2">Orbit Apps</div>
+                        </div>
+                      </div>
+                      <div class="d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-package-variant-closed</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month1.multiComponent }}</div>
+                          <div class="text-subtitle-2">Multi-Component Apps</div>
+                        </div>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+
+                <v-col cols="12" md="2" class="d-flex align-center justify-center">
+                  <v-card variant="flat" class="text-center">
+                    <v-card-text>
+                      <v-icon size="60" color="secondary">mdi-compare-horizontal</v-icon>
+                      <div class="mt-4">
+                        <div class="text-caption mb-2">Apps Change</div>
+                        <v-chip :color="results.comparison.differences.apps >= 0 ? 'success' : 'error'">
+                          {{ results.comparison.differences.apps >= 0 ? '+' : '' }}{{ results.comparison.differences.apps }}
+                          ({{ results.comparison.differences.appsPercent }}%)
+                        </v-chip>
+                      </div>
+                      <div class="mt-3">
+                        <div class="text-caption mb-2">Instances Change</div>
+                        <v-chip :color="results.comparison.differences.instances >= 0 ? 'success' : 'error'">
+                          {{ results.comparison.differences.instances >= 0 ? '+' : '' }}{{ results.comparison.differences.instances }}
+                          ({{ results.comparison.differences.instancesPercent }}%)
+                        </v-chip>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+
+                <v-col cols="12" md="5">
+                  <v-card variant="tonal" color="secondary" rounded="lg">
+                    <v-card-title>{{ results.comparison.month2.name }}</v-card-title>
+                    <v-card-text>
+                      <div class="mb-3 d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-apps</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month2.totalApps }}</div>
+                          <div class="text-subtitle-2">Total Apps</div>
+                        </div>
+                      </div>
+                      <div class="mb-3 d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-server-network</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month2.totalInstances }}</div>
+                          <div class="text-subtitle-2">Total Instances</div>
+                        </div>
+                      </div>
+                      <div class="mb-3 d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-rocket-launch</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month2.orbitApps }}</div>
+                          <div class="text-subtitle-2">Orbit Apps</div>
+                        </div>
+                      </div>
+                      <div class="d-flex align-center">
+                        <v-icon size="32" class="mr-3">mdi-package-variant-closed</v-icon>
+                        <div>
+                          <div class="text-h4">{{ results.comparison.month2.multiComponent }}</div>
+                          <div class="text-subtitle-2">Multi-Component Apps</div>
+                        </div>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- Comparison Charts -->
+      <v-row class="mb-6 justify-center">
+        <v-col cols="12" sm="6" md="6" lg="3" xl="3">
+          <v-card>
+            <v-card-title>Apps Comparison</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Bar :data="comparisonAppsChartData" :options="chartOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="6" lg="3" xl="3">
+          <v-card>
+            <v-card-title>Instances Comparison</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Bar :data="comparisonInstancesChartData" :options="chartOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="6" lg="3" xl="3">
+          <v-card>
+            <v-card-title>Repository Visibility</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Bar :data="comparisonRepoVisibilityChartData" :options="chartOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" sm="6" md="6" lg="3" xl="3">
+          <v-card>
+            <v-card-title>Orbit vs Non-Orbit</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Bar :data="comparisonOrbitChartData" :options="chartOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- Category Comparison Chart -->
+      <v-row class="mb-6">
+        <v-col cols="12">
+          <v-card>
+            <v-card-title>Apps by Category</v-card-title>
+            <v-card-text style="height: 400px;">
+              <Bar :data="comparisonCategoryChartData" :options="chartOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </template>
+
+    <template v-if="results && !results.isComparison && !loading">
       <!-- Summary Cards -->
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4" lg="2">
@@ -556,13 +768,36 @@ const BLOCK_TIME_PRE_FORK = 120 // seconds (2 minutes)
 const BLOCK_TIME_POST_FORK = 30 // seconds (0.5 minutes)
 
 // Reactive state
+const analysisMode = ref('single')
 const startDate = ref('')
 const endDate = ref('')
+const compareMonth1 = ref(null)
+const compareMonth2 = ref(null)
 const loading = ref(false)
 const loadingMessage = ref('')
 const error = ref('')
 const results = ref(null)
 const instanceThreshold = ref(10)
+
+// Generate available months (last 24 months)
+const availableMonths = computed(() => {
+  const months = []
+  const currentDate = new Date()
+
+  for (let i = 0; i < 24; i++) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const monthName = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+
+    months.push({
+      title: monthName,
+      value: { year, month }
+    })
+  }
+
+  return months
+})
 
 // Set default date (AMA date)
 const now = new Date()
@@ -857,9 +1092,246 @@ const analyze = async () => {
   }
 }
 
+// Compare two months
+const compareMonths = async () => {
+  if (!compareMonth1.value || !compareMonth2.value) return
+
+  loading.value = true
+  error.value = ''
+  results.value = null
+
+  try {
+    loadingMessage.value = 'Fetching permanent messages from Flux API...'
+
+    const response = await fetch(`${API_BASE}/apps/permanentmessages`)
+    const data = await response.json()
+
+    if (data.status !== 'success') {
+      throw new Error('Failed to fetch data from API')
+    }
+
+    const messages = data.data
+    const registerMessages = messages.filter(msg => msg.type === 'fluxappregister')
+
+    // Process both months
+    const month1Data = processMonthData(registerMessages, compareMonth1.value.year, compareMonth1.value.month)
+    const month2Data = processMonthData(registerMessages, compareMonth2.value.year, compareMonth2.value.month)
+
+    // Calculate comparison metrics
+    const comparison = {
+      month1: {
+        ...month1Data,
+        name: availableMonths.value.find(m => m.value.year === compareMonth1.value.year && m.value.month === compareMonth1.value.month)?.title
+      },
+      month2: {
+        ...month2Data,
+        name: availableMonths.value.find(m => m.value.year === compareMonth2.value.year && m.value.month === compareMonth2.value.month)?.title
+      },
+      differences: {
+        apps: month2Data.totalApps - month1Data.totalApps,
+        appsPercent: month1Data.totalApps > 0 ? ((month2Data.totalApps - month1Data.totalApps) / month1Data.totalApps * 100).toFixed(1) : 'N/A',
+        instances: month2Data.totalInstances - month1Data.totalInstances,
+        instancesPercent: month1Data.totalInstances > 0 ? ((month2Data.totalInstances - month1Data.totalInstances) / month1Data.totalInstances * 100).toFixed(1) : 'N/A',
+        orbitApps: month2Data.orbitApps - month1Data.orbitApps,
+        multiComponent: month2Data.multiComponent - month1Data.multiComponent
+      }
+    }
+
+    results.value = { isComparison: true, comparison }
+
+  } catch (err) {
+    error.value = err.message || 'Failed to compare months'
+    console.error(err)
+  } finally {
+    loading.value = false
+    loadingMessage.value = ''
+  }
+}
+
+// Helper function to process month data
+const processMonthData = (messages, year, month) => {
+  const startDate = new Date(Date.UTC(year, month, 1))
+  const endDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
+
+  const startTimestamp = startDate.getTime()
+  const endTimestamp = endDate.getTime()
+
+  const monthMessages = messages.filter(msg =>
+    msg.timestamp >= startTimestamp &&
+    msg.timestamp <= endTimestamp
+  )
+
+  const uniqueApps = new Map()
+  let totalInstances = 0
+  let orbitApps = 0
+  let multiComponent = 0
+  let publicRepos = 0
+  let privateRepos = 0
+  const categoryCount = new Map()
+
+  monthMessages.forEach(msg => {
+    const specs = msg.appSpecifications
+    if (!specs || !specs.name) return
+
+    if (!uniqueApps.has(specs.name)) {
+      uniqueApps.set(specs.name, true)
+      totalInstances += specs.instances || 0
+
+      if (usesOrbitImage(specs.compose)) {
+        orbitApps++
+      }
+
+      if (Array.isArray(specs.compose) && specs.compose.length > 1) {
+        multiComponent++
+      }
+
+      // Check repository visibility
+      const compose = Array.isArray(specs.compose) ? specs.compose : [specs.compose]
+      compose.forEach(comp => {
+        if (comp && comp.repotag) {
+          if (comp.repotag.includes('ghcr.io')) {
+            publicRepos++
+          } else {
+            privateRepos++
+          }
+        }
+      })
+
+      // Count by category
+      const category = categorizeApp(specs.name)
+      categoryCount.set(category, (categoryCount.get(category) || 0) + 1)
+    }
+  })
+
+  return {
+    totalApps: uniqueApps.size,
+    totalInstances,
+    orbitApps,
+    multiComponent,
+    publicRepos,
+    privateRepos,
+    categoryCount
+  }
+}
+
+// Comparison chart data
+const comparisonAppsChartData = computed(() => {
+  if (!results.value || !results.value.isComparison) return null
+
+  const comp = results.value.comparison
+
+  return {
+    labels: ['Total Apps', 'Orbit Apps', 'Multi-Component'],
+    datasets: [
+      {
+        label: comp.month1.name,
+        data: [comp.month1.totalApps, comp.month1.orbitApps, comp.month1.multiComponent],
+        backgroundColor: isDark.value ? 'rgba(139, 156, 240, 0.7)' : '#667eea',
+      },
+      {
+        label: comp.month2.name,
+        data: [comp.month2.totalApps, comp.month2.orbitApps, comp.month2.multiComponent],
+        backgroundColor: isDark.value ? 'rgba(150, 111, 214, 0.7)' : '#764ba2',
+      }
+    ]
+  }
+})
+
+const comparisonInstancesChartData = computed(() => {
+  if (!results.value || !results.value.isComparison) return null
+
+  const comp = results.value.comparison
+
+  return {
+    labels: [comp.month1.name, comp.month2.name],
+    datasets: [{
+      label: 'Total Instances',
+      data: [comp.month1.totalInstances, comp.month2.totalInstances],
+      backgroundColor: [
+        isDark.value ? 'rgba(94, 245, 157, 0.7)' : '#43e97b',
+        isDark.value ? 'rgba(111, 190, 254, 0.7)' : '#4facfe'
+      ],
+    }]
+  }
+})
+
+const comparisonRepoVisibilityChartData = computed(() => {
+  if (!results.value || !results.value.isComparison) return null
+
+  const comp = results.value.comparison
+
+  return {
+    labels: ['Public Repos', 'Private Repos'],
+    datasets: [
+      {
+        label: comp.month1.name,
+        data: [comp.month1.publicRepos, comp.month1.privateRepos],
+        backgroundColor: isDark.value ? 'rgba(139, 156, 240, 0.7)' : '#667eea',
+      },
+      {
+        label: comp.month2.name,
+        data: [comp.month2.publicRepos, comp.month2.privateRepos],
+        backgroundColor: isDark.value ? 'rgba(150, 111, 214, 0.7)' : '#764ba2',
+      }
+    ]
+  }
+})
+
+const comparisonOrbitChartData = computed(() => {
+  if (!results.value || !results.value.isComparison) return null
+
+  const comp = results.value.comparison
+
+  return {
+    labels: ['Orbit Apps', 'Non-Orbit Apps'],
+    datasets: [
+      {
+        label: comp.month1.name,
+        data: [comp.month1.orbitApps, comp.month1.totalApps - comp.month1.orbitApps],
+        backgroundColor: isDark.value ? 'rgba(139, 156, 240, 0.7)' : '#667eea',
+      },
+      {
+        label: comp.month2.name,
+        data: [comp.month2.orbitApps, comp.month2.totalApps - comp.month2.orbitApps],
+        backgroundColor: isDark.value ? 'rgba(150, 111, 214, 0.7)' : '#764ba2',
+      }
+    ]
+  }
+})
+
+const comparisonCategoryChartData = computed(() => {
+  if (!results.value || !results.value.isComparison) return null
+
+  const comp = results.value.comparison
+
+  // Get all unique categories from both months
+  const allCategories = new Set([
+    ...Array.from(comp.month1.categoryCount.keys()),
+    ...Array.from(comp.month2.categoryCount.keys())
+  ])
+
+  const categories = Array.from(allCategories).sort()
+
+  return {
+    labels: categories,
+    datasets: [
+      {
+        label: comp.month1.name,
+        data: categories.map(cat => comp.month1.categoryCount.get(cat) || 0),
+        backgroundColor: isDark.value ? 'rgba(139, 156, 240, 0.7)' : '#667eea',
+      },
+      {
+        label: comp.month2.name,
+        data: categories.map(cat => comp.month2.categoryCount.get(cat) || 0),
+        backgroundColor: isDark.value ? 'rgba(150, 111, 214, 0.7)' : '#764ba2',
+      }
+    ]
+  }
+})
+
 // Chart data
 const ownerChartData = computed(() => {
-  if (!results.value) return null
+  if (!results.value || results.value.isComparison) return null
 
   const top10 = results.value.topOwners.slice(0, 10)
 
@@ -878,7 +1350,7 @@ const ownerChartData = computed(() => {
 })
 
 const instancesChartData = computed(() => {
-  if (!results.value) return null
+  if (!results.value || results.value.isComparison) return null
 
   const top10 = results.value.topOwners.slice(0, 10)
 
@@ -903,7 +1375,7 @@ const instancesChartData = computed(() => {
 })
 
 const timelineChartData = computed(() => {
-  if (!results.value || results.value.allRegistrations.length === 0) return null
+  if (!results.value || results.value.isComparison || results.value.allRegistrations?.length === 0) return null
 
   // Group by day
   const appsByDay = new Map()
@@ -932,7 +1404,7 @@ const timelineChartData = computed(() => {
 })
 
 const cumulativeChartData = computed(() => {
-  if (!results.value || results.value.allRegistrations.length === 0) return null
+  if (!results.value || results.value.isComparison || results.value.allRegistrations?.length === 0) return null
 
   // Group by day
   const appsByDay = new Map()
@@ -968,7 +1440,7 @@ const cumulativeChartData = computed(() => {
 })
 
 const instanceDistributionChartData = computed(() => {
-  if (!results.value) return null
+  if (!results.value || results.value.isComparison) return null
 
   // Generate highly distinct colors using golden angle for maximum separation
   const generateColor = (index) => {
@@ -1023,7 +1495,7 @@ const instanceDistributionChartData = computed(() => {
 })
 
 const categoryChartData = computed(() => {
-  if (!results.value) return null
+  if (!results.value || results.value.isComparison) return null
 
   const categories = new Map()
 
@@ -1051,7 +1523,7 @@ const categoryChartData = computed(() => {
 })
 
 const orbitChartData = computed(() => {
-  if (!results.value || !results.value.summary) return null
+  if (!results.value || results.value.isComparison || !results.value.summary) return null
 
   const orbitCount = results.value.summary.orbitApps || 0
   const nonOrbitCount = results.value.summary.newApps - orbitCount
@@ -1075,7 +1547,7 @@ const orbitChartData = computed(() => {
 })
 
 const multiComponentChartData = computed(() => {
-  if (!results.value || !results.value.summary) return null
+  if (!results.value || results.value.isComparison || !results.value.summary) return null
 
   const multiCount = results.value.summary.multiComponentApps || 0
   const singleCount = results.value.summary.newApps - multiCount
@@ -1099,7 +1571,7 @@ const multiComponentChartData = computed(() => {
 })
 
 const repoVisibilityChartData = computed(() => {
-  if (!results.value) return null
+  if (!results.value || results.value.isComparison) return null
 
   let publicCount = 0
   let privateCount = 0
@@ -1133,7 +1605,7 @@ const repoVisibilityChartData = computed(() => {
 })
 
 const highInstanceApps = computed(() => {
-  if (!results.value || !results.value.newApps) return []
+  if (!results.value || results.value.isComparison || !results.value.newApps) return []
 
   return results.value.newApps
     .filter(app => app.instances > instanceThreshold.value)
