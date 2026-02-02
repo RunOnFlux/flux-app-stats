@@ -243,6 +243,15 @@
             </v-card-text>
           </v-card>
         </v-col>
+
+        <v-col v-if="repoVisibilityChartData" cols="12" md="6">
+          <v-card>
+            <v-card-title>Repository Visibility</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Doughnut :data="repoVisibilityChartData" :options="doughnutOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
       </v-row>
 
       <!-- High Instance Apps List -->
@@ -282,8 +291,17 @@
                   <v-chip variant="tonal" color="secondary" prepend-icon="mdi-package-variant" size="small" class="mr-2 mb-2">
                     {{ app.components }} component{{ app.components > 1 ? 's' : '' }}
                   </v-chip>
-                  <v-chip v-if="app.isOrbitApp" variant="tonal" color="purple" prepend-icon="mdi-rocket-launch" size="small" class="mr-2 mb-2">
+                  <v-chip v-if="app.isOrbitApp" variant="tonal" color="cyan" prepend-icon="mdi-rocket-launch" size="small" class="mr-2 mb-2">
                     Orbit
+                  </v-chip>
+                  <v-chip
+                    variant="tonal"
+                    :color="app.repotags && app.repotags.length > 0 ? 'success' : 'warning'"
+                    :prepend-icon="app.repotags && app.repotags.length > 0 ? 'mdi-lock-open-variant' : 'mdi-lock'"
+                    size="small"
+                    class="mr-2 mb-2"
+                  >
+                    {{ app.repotags && app.repotags.length > 0 ? 'Public' : 'Private' }}
                   </v-chip>
                 </div>
                 <div class="d-flex align-center" style="gap: 4px;">
@@ -345,7 +363,7 @@
       <div v-if="results.orbitApps.length > 0" class="mb-6">
         <div class="d-flex align-center mb-4">
           <h2 class="text-h5">Orbit Apps</h2>
-          <v-chip variant="tonal" color="purple" prepend-icon="mdi-rocket-launch" class="ml-3">{{ results.orbitApps.length }}</v-chip>
+          <v-chip variant="tonal" color="cyan" prepend-icon="mdi-rocket-launch" class="ml-3">{{ results.orbitApps.length }}</v-chip>
         </div>
         <RecycleScroller
           class="app-scroller"
@@ -359,6 +377,15 @@
               <div class="app-name">
                 {{ index + 1 }}. {{ item.name }}
                 <v-chip v-if="item.isMultiComponent" variant="tonal" color="secondary" size="x-small" class="ml-2">{{ item.components }} components</v-chip>
+                <v-chip
+                  variant="tonal"
+                  :color="item.repotags && item.repotags.length > 0 ? 'success' : 'warning'"
+                  :prepend-icon="item.repotags && item.repotags.length > 0 ? 'mdi-lock-open-variant' : 'mdi-lock'"
+                  size="x-small"
+                  class="ml-2"
+                >
+                  {{ item.repotags && item.repotags.length > 0 ? 'Public' : 'Private' }}
+                </v-chip>
               </div>
             </div>
             <div class="app-details">
@@ -417,7 +444,16 @@
               <div class="app-name">
                 {{ index + 1 }}. {{ item.name }}
                 <v-chip v-if="item.isMultiComponent" variant="tonal" color="secondary" size="x-small" class="ml-2">{{ item.components }} components</v-chip>
-                <v-chip v-if="item.isOrbitApp" variant="tonal" color="purple" size="x-small" class="ml-2">Orbit</v-chip>
+                <v-chip v-if="item.isOrbitApp" variant="tonal" color="cyan" size="x-small" class="ml-2">Orbit</v-chip>
+                <v-chip
+                  variant="tonal"
+                  :color="item.repotags && item.repotags.length > 0 ? 'success' : 'warning'"
+                  :prepend-icon="item.repotags && item.repotags.length > 0 ? 'mdi-lock-open-variant' : 'mdi-lock'"
+                  size="x-small"
+                  class="ml-2"
+                >
+                  {{ item.repotags && item.repotags.length > 0 ? 'Public' : 'Private' }}
+                </v-chip>
               </div>
             </div>
             <div class="app-details">
@@ -1027,6 +1063,35 @@ const multiComponentChartData = computed(() => {
       backgroundColor: [
         '#43e97b',
         '#667eea'
+      ],
+      borderWidth: 0
+    }]
+  }
+})
+
+const repoVisibilityChartData = computed(() => {
+  if (!results.value) return null
+
+  let publicCount = 0
+  let privateCount = 0
+
+  results.value.newApps.forEach(app => {
+    if (app.repotags && app.repotags.length > 0) {
+      publicCount++
+    } else {
+      privateCount++
+    }
+  })
+
+  if (publicCount === 0 && privateCount === 0) return null
+
+  return {
+    labels: ['Public Repositories', 'Private Repositories'],
+    datasets: [{
+      data: [publicCount, privateCount],
+      backgroundColor: [
+        '#00bcd4',  // Cyan for public
+        '#ff9800'   // Orange for private
       ],
       borderWidth: 0
     }]
