@@ -513,7 +513,8 @@ import {
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 } from 'chart.js'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 
@@ -527,6 +528,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
+  Filler,
   ChartDataLabels
 )
 
@@ -880,15 +882,21 @@ const instancesChartData = computed(() => {
 
   const top10 = results.value.topOwners.slice(0, 10)
 
+  const colors = isDark.value ? [
+    'rgba(139, 156, 240, 0.7)', 'rgba(150, 111, 214, 0.7)', 'rgba(240, 147, 251, 0.7)', 'rgba(111, 190, 254, 0.7)',
+    'rgba(94, 245, 157, 0.7)', 'rgba(250, 112, 154, 0.7)', 'rgba(254, 225, 64, 0.7)', 'rgba(80, 227, 226, 0.7)',
+    'rgba(188, 245, 234, 0.7)', 'rgba(254, 214, 227, 0.7)'
+  ] : [
+    '#667eea', '#764ba2', '#f093fb', '#4facfe',
+    '#43e97b', '#fa709a', '#fee140', '#30cfd0',
+    '#a8edea', '#fed6e3'
+  ]
+
   return {
     labels: top10.map(o => o.owner.substring(0, 12) + '...'),
     datasets: [{
       data: top10.map(o => o.instances),
-      backgroundColor: [
-        '#667eea', '#764ba2', '#f093fb', '#4facfe',
-        '#43e97b', '#fa709a', '#fee140', '#30cfd0',
-        '#a8edea', '#fed6e3'
-      ],
+      backgroundColor: colors,
       borderWidth: 0
     }]
   }
@@ -907,15 +915,18 @@ const timelineChartData = computed(() => {
 
   const sortedDays = Array.from(appsByDay.keys()).sort()
 
+  const borderColor = isDark.value ? '#8b9cf0' : '#667eea'
+  const bgColor = isDark.value ? 'rgba(139, 156, 240, 0.2)' : 'rgba(102, 126, 234, 0.2)'
+
   return {
     labels: sortedDays.map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
     datasets: [{
       label: 'New Apps',
       data: sortedDays.map(d => appsByDay.get(d)),
-      borderColor: '#667eea',
-      backgroundColor: 'rgba(102, 126, 234, 0.1)',
+      borderColor: borderColor,
+      backgroundColor: bgColor,
       tension: 0.4,
-      fill: true,
+      fill: 'origin',
     }]
   }
 })
@@ -940,15 +951,18 @@ const cumulativeChartData = computed(() => {
     return cumulative
   })
 
+  const borderColor = isDark.value ? '#5ef59d' : '#43e97b'
+  const bgColor = isDark.value ? 'rgba(94, 245, 157, 0.2)' : 'rgba(67, 233, 123, 0.2)'
+
   return {
     labels: sortedDays.map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
     datasets: [{
       label: 'Total Apps',
       data: cumulativeData,
-      borderColor: '#43e97b',
-      backgroundColor: 'rgba(67, 233, 123, 0.1)',
+      borderColor: borderColor,
+      backgroundColor: bgColor,
       tension: 0.4,
-      fill: true,
+      fill: 'origin',
     }]
   }
 })
@@ -1018,14 +1032,19 @@ const categoryChartData = computed(() => {
     categories.set(cat, (categories.get(cat) || 0) + 1)
   })
 
+  const colors = isDark.value ? [
+    'rgba(139, 156, 240, 0.7)', 'rgba(150, 111, 214, 0.7)', 'rgba(240, 147, 251, 0.7)', 'rgba(111, 190, 254, 0.7)',
+    'rgba(94, 245, 157, 0.7)', 'rgba(250, 112, 154, 0.7)'
+  ] : [
+    '#667eea', '#764ba2', '#f093fb', '#4facfe',
+    '#43e97b', '#fa709a'
+  ]
+
   return {
     labels: Array.from(categories.keys()),
     datasets: [{
       data: Array.from(categories.values()),
-      backgroundColor: [
-        '#667eea', '#764ba2', '#f093fb', '#4facfe',
-        '#43e97b', '#fa709a'
-      ],
+      backgroundColor: colors,
       borderWidth: 0
     }]
   }
@@ -1037,14 +1056,19 @@ const orbitChartData = computed(() => {
   const orbitCount = results.value.summary.orbitApps || 0
   const nonOrbitCount = results.value.summary.newApps - orbitCount
 
+  const colors = isDark.value ? [
+    'rgba(240, 147, 251, 0.7)',
+    'rgba(139, 156, 240, 0.7)'
+  ] : [
+    '#f093fb',
+    '#667eea'
+  ]
+
   return {
     labels: ['Orbit Apps', 'Non-Orbit Apps'],
     datasets: [{
       data: [orbitCount, nonOrbitCount],
-      backgroundColor: [
-        '#f093fb',
-        '#667eea'
-      ],
+      backgroundColor: colors,
       borderWidth: 0
     }]
   }
@@ -1056,14 +1080,19 @@ const multiComponentChartData = computed(() => {
   const multiCount = results.value.summary.multiComponentApps || 0
   const singleCount = results.value.summary.newApps - multiCount
 
+  const colors = isDark.value ? [
+    'rgba(94, 245, 157, 0.7)',
+    'rgba(139, 156, 240, 0.7)'
+  ] : [
+    '#43e97b',
+    '#667eea'
+  ]
+
   return {
     labels: ['Multi-Component', 'Single Component'],
     datasets: [{
       data: [multiCount, singleCount],
-      backgroundColor: [
-        '#43e97b',
-        '#667eea'
-      ],
+      backgroundColor: colors,
       borderWidth: 0
     }]
   }
@@ -1085,14 +1114,19 @@ const repoVisibilityChartData = computed(() => {
 
   if (publicCount === 0 && privateCount === 0) return null
 
+  const colors = isDark.value ? [
+    'rgba(38, 198, 218, 0.7)',  // Lighter cyan for dark theme
+    'rgba(255, 167, 38, 0.7)'   // Lighter orange for dark theme
+  ] : [
+    '#00bcd4',  // Cyan for public
+    '#ff9800'   // Orange for private
+  ]
+
   return {
     labels: ['Public Repositories', 'Private Repositories'],
     datasets: [{
       data: [publicCount, privateCount],
-      backgroundColor: [
-        '#00bcd4',  // Cyan for public
-        '#ff9800'   // Orange for private
-      ],
+      backgroundColor: colors,
       borderWidth: 0
     }]
   }
