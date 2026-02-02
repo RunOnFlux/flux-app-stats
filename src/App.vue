@@ -55,19 +55,17 @@
           </v-col>
         </v-row>
 
-        <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
-          {{ error }}
-        </v-alert>
-
-        <v-card v-if="loading" class="mb-4">
-          <v-card-text class="d-flex flex-column align-center pa-8">
-            <v-progress-circular
-              indeterminate
-              color="primary"
-              size="64"
-              class="mb-4"
-            ></v-progress-circular>
-            <div>{{ loadingMessage }}</div>
+        <v-card v-if="error" class="mb-4 error-card" color="error" variant="tonal" elevation="8" rounded="xl">
+          <v-card-text class="d-flex flex-column align-center pa-10">
+            <v-icon
+              size="100"
+              color="error"
+              class="mb-6 glow-icon"
+            >
+              mdi-alert-circle-outline
+            </v-icon>
+            <div class="text-h5 font-weight-bold text-center mb-2">Oops! Something went wrong</div>
+            <div class="text-body-1 text-center text-medium-emphasis">{{ error }}</div>
           </v-card-text>
         </v-card>
 
@@ -197,6 +195,24 @@
             <v-card-title>Apps Over Time</v-card-title>
             <v-card-text style="height: 300px;">
               <Line :data="timelineChartData" :options="timelineOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-card>
+            <v-card-title>Cumulative Apps Growth</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Line :data="cumulativeChartData" :options="timelineOptions" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-card>
+            <v-card-title>Instance Distribution</v-card-title>
+            <v-card-text style="height: 300px;">
+              <Bar :data="instanceDistributionChartData" :options="chartOptions" />
             </v-card-text>
           </v-card>
         </v-col>
@@ -837,6 +853,7 @@ const instancesChartData = computed(() => {
         '#43e97b', '#fa709a', '#fee140', '#30cfd0',
         '#a8edea', '#fed6e3'
       ],
+      borderWidth: 0
     }]
   }
 })
@@ -867,6 +884,94 @@ const timelineChartData = computed(() => {
   }
 })
 
+const cumulativeChartData = computed(() => {
+  if (!results.value || results.value.allRegistrations.length === 0) return null
+
+  // Group by day
+  const appsByDay = new Map()
+
+  results.value.allRegistrations.forEach(app => {
+    const day = app.date.toISOString().split('T')[0]
+    appsByDay.set(day, (appsByDay.get(day) || 0) + 1)
+  })
+
+  const sortedDays = Array.from(appsByDay.keys()).sort()
+
+  // Calculate cumulative totals
+  let cumulative = 0
+  const cumulativeData = sortedDays.map(d => {
+    cumulative += appsByDay.get(d)
+    return cumulative
+  })
+
+  return {
+    labels: sortedDays.map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+    datasets: [{
+      label: 'Total Apps',
+      data: cumulativeData,
+      borderColor: '#43e97b',
+      backgroundColor: 'rgba(67, 233, 123, 0.1)',
+      tension: 0.4,
+      fill: true,
+    }]
+  }
+})
+
+const instanceDistributionChartData = computed(() => {
+  if (!results.value) return null
+
+  // Generate highly distinct colors using golden angle for maximum separation
+  const generateColor = (index) => {
+    // Use golden angle (~137.5°) to maximize color difference between adjacent bars
+    const goldenAngle = 137.5
+    const hue = (index * goldenAngle) % 360
+
+    // Avoid red spectrum (0-30 and 330-360)
+    let adjustedHue = hue
+    if (hue < 30) adjustedHue = hue + 60
+    else if (hue > 330) adjustedHue = hue - 60
+
+    // High saturation and moderate-high lightness for vibrant, bright colors
+    const saturation = 85 + (index % 4) * 5 // Very saturated (85-100%)
+    const lightness = 55 + ((index % 5) - 2) * 5 // Brighter (50-65%)
+
+    return `hsl(${adjustedHue}, ${saturation}%, ${lightness}%)`
+  }
+
+  // Count instances for each value from 1 to 100
+  const instanceCounts = {}
+  results.value.newApps.forEach(app => {
+    const instances = app.instances || 0
+    if (instances >= 1 && instances <= 100) {
+      instanceCounts[instances] = (instanceCounts[instances] || 0) + 1
+    }
+  })
+
+  // Filter out values with no data and sort
+  const filteredLabels = []
+  const filteredData = []
+  const filteredColors = []
+
+  Object.keys(instanceCounts)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .forEach(value => {
+      filteredLabels.push(value.toString())
+      filteredData.push(instanceCounts[value])
+      filteredColors.push(generateColor(value - 1))
+    })
+
+  return {
+    labels: filteredLabels,
+    datasets: [{
+      label: 'Number of Apps',
+      data: filteredData,
+      backgroundColor: filteredColors,
+      borderWidth: 0
+    }]
+  }
+})
+
 const categoryChartData = computed(() => {
   if (!results.value) return null
 
@@ -885,6 +990,7 @@ const categoryChartData = computed(() => {
         '#667eea', '#764ba2', '#f093fb', '#4facfe',
         '#43e97b', '#fa709a'
       ],
+      borderWidth: 0
     }]
   }
 })
@@ -903,6 +1009,7 @@ const orbitChartData = computed(() => {
         '#f093fb',
         '#667eea'
       ],
+      borderWidth: 0
     }]
   }
 })
@@ -921,6 +1028,7 @@ const multiComponentChartData = computed(() => {
         '#43e97b',
         '#667eea'
       ],
+      borderWidth: 0
     }]
   }
 })
@@ -955,6 +1063,9 @@ const chartOptions = computed(() => {
         },
         grid: {
           color: gridColor
+        },
+        border: {
+          color: gridColor
         }
       },
       y: {
@@ -962,6 +1073,9 @@ const chartOptions = computed(() => {
           color: textColor
         },
         grid: {
+          color: gridColor
+        },
+        border: {
           color: gridColor
         }
       }
@@ -975,6 +1089,11 @@ const doughnutOptions = computed(() => {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    elements: {
+      arc: {
+        borderRadius: 0
+      }
+    },
     plugins: {
       legend: {
         position: 'bottom',
@@ -1113,6 +1232,9 @@ const timelineOptions = computed(() => {
         },
         grid: {
           color: gridColor
+        },
+        border: {
+          color: gridColor
         }
       },
       y: {
@@ -1123,9 +1245,43 @@ const timelineOptions = computed(() => {
         },
         grid: {
           color: gridColor
+        },
+        border: {
+          color: gridColor
         }
       }
     }
   }
 })
 </script>
+
+<style scoped>
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(var(--v-theme-error), 0.3));
+    opacity: 1;
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(var(--v-theme-error), 0.5));
+    opacity: 1;
+  }
+}
+
+.glow-icon {
+  animation: glow 2s ease-in-out infinite;
+}
+
+</style>
