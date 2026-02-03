@@ -19,6 +19,14 @@ const vuetify = createVuetify({
   },
   theme: {
     defaultTheme: 'dark',
+    themes: {
+      light: {
+        dark: false,
+      },
+      dark: {
+        dark: true,
+      },
+    },
   },
 })
 

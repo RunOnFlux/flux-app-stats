@@ -9,12 +9,10 @@
             <p>Analyze app registrations on the Flux network from any time period</p>
           </div>
           <v-btn
-            icon
+            :icon="isDark ? 'mdi-white-balance-sunny' : 'mdi-weather-night'"
             @click="toggleTheme"
             variant="text"
-          >
-            <v-icon>{{ isDark ? 'mdi-white-balance-sunny' : 'mdi-weather-night' }}</v-icon>
-          </v-btn>
+          ></v-btn>
         </div>
 
         <v-row class="mb-4 justify-center">
@@ -100,7 +98,7 @@
               color="primary"
               size="large"
               :loading="loading"
-              :disabled="!compareMonth1 || !compareMonth2"
+              :disabled="!compareMonth1 || !compareMonth2 || isSameMonth"
               @click="compareMonths"
             >
               Compare
@@ -122,8 +120,37 @@
           </v-card-text>
         </v-card>
 
+        <v-card v-if="results && !results.isComparison && !loading && results.summary.newApps === 0" class="mb-4" color="info" variant="tonal" elevation="8" rounded="xl">
+          <v-card-text class="d-flex flex-column align-center pa-10">
+            <v-icon
+              size="100"
+              color="info"
+              class="mb-6"
+            >
+              mdi-information-outline
+            </v-icon>
+            <div class="text-h5 font-weight-bold text-center mb-2">No Apps Found</div>
+            <div class="text-body-1 text-center text-medium-emphasis">No app registrations were found in the selected time period.</div>
+          </v-card-text>
+        </v-card>
+
+    <!-- No Data Message for Comparison -->
+    <v-card v-if="results && results.isComparison && !loading && results.comparison.month1.totalApps === 0 && results.comparison.month2.totalApps === 0" class="mb-4" color="info" variant="tonal" elevation="8" rounded="xl">
+      <v-card-text class="d-flex flex-column align-center pa-10">
+        <v-icon
+          size="100"
+          color="info"
+          class="mb-6"
+        >
+          mdi-information-outline
+        </v-icon>
+        <div class="text-h5 font-weight-bold text-center mb-2">No Apps Found</div>
+        <div class="text-body-1 text-center text-medium-emphasis">No app registrations were found in either of the selected months.</div>
+      </v-card-text>
+    </v-card>
+
     <!-- Comparison Results -->
-    <template v-if="results && results.isComparison && !loading">
+    <template v-if="results && results.isComparison && !loading && (results.comparison.month1.totalApps > 0 || results.comparison.month2.totalApps > 0)">
       <v-row class="mb-6">
         <v-col cols="12">
           <v-card rounded="lg">
@@ -281,7 +308,7 @@
       </v-row>
     </template>
 
-    <template v-if="results && !results.isComparison && !loading">
+    <template v-if="results && !results.isComparison && !loading && results.summary.newApps > 0">
       <!-- Summary Cards -->
       <v-row class="mb-6">
         <v-col cols="12" sm="6" md="4" lg="2">
@@ -712,7 +739,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { Bar, Doughnut, Line, Pie } from 'vue-chartjs'
 import {
@@ -748,17 +775,17 @@ const API_BASE = 'https://api.runonflux.io'
 
 // Theme management
 const theme = useTheme()
-const isDark = computed(() => theme.global.current.value.dark)
+const isDark = computed(() => theme.current.value.dark)
 
 // Load saved theme preference on mount
 const savedTheme = localStorage.getItem('theme')
 if (savedTheme) {
-  theme.global.name.value = savedTheme
+  theme.name.value = savedTheme
 }
 
 const toggleTheme = () => {
-  const newTheme = theme.global.current.value.dark ? 'light' : 'dark'
-  theme.global.name.value = newTheme
+  const newTheme = theme.current.value.dark ? 'light' : 'dark'
+  theme.name.value = newTheme
   localStorage.setItem('theme', newTheme)
 }
 
@@ -778,6 +805,29 @@ const loadingMessage = ref('')
 const error = ref('')
 const results = ref(null)
 const instanceThreshold = ref(10)
+
+// Clear results and error when switching analysis mode
+watch(analysisMode, () => {
+  results.value = null
+  error.value = ''
+})
+
+// Check if the same month is selected for comparison
+const isSameMonth = computed(() => {
+  if (!compareMonth1.value || !compareMonth2.value) return false
+  return compareMonth1.value.year === compareMonth2.value.year &&
+         compareMonth1.value.month === compareMonth2.value.month
+})
+
+// Watch for same month selection and show error
+watch(isSameMonth, (newValue) => {
+  if (newValue) {
+    error.value = 'Cannot compare the same month. Please select two different months.'
+    results.value = null
+  } else if (analysisMode.value === 'compare') {
+    error.value = ''
+  }
+})
 
 // Generate available months (last 24 months)
 const availableMonths = computed(() => {
@@ -799,9 +849,16 @@ const availableMonths = computed(() => {
   return months
 })
 
-// Set default date (AMA date)
+// Set default dates (AMA date to now)
 const now = new Date()
+const year = now.getFullYear()
+const month = String(now.getMonth() + 1).padStart(2, '0')
+const day = String(now.getDate()).padStart(2, '0')
+const hours = String(now.getHours()).padStart(2, '0')
+const minutes = String(now.getMinutes()).padStart(2, '0')
+
 startDate.value = '2026-01-28T17:00'
+endDate.value = `${year}-${month}-${day}T${hours}:${minutes}`
 
 // Validate dates
 const validateDates = () => {
@@ -810,6 +867,7 @@ const validateDates = () => {
     const end = new Date(endDate.value)
     if (end <= start) {
       error.value = 'End date must be after start date'
+      results.value = null
       return false
     }
   }
